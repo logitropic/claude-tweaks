@@ -4,6 +4,12 @@
 
 **Recommended only when using third-party (3P) inference providers.** If you use Claude with Anthropic's default API, you don't need any of these tweaks.
 
+## Demo
+
+[![Watch the demo on YouTube](https://img.youtube.com/vi/aYqx4Ogf-7w/maxresdefault.jpg)](https://youtu.be/aYqx4Ogf-7w)
+
+<https://youtu.be/aYqx4Ogf-7w>
+
 ## What it does
 
 `claude-tweaks` modifies `Claude.app/Contents/Resources/app.asar` to install one or more of these tweaks. Each tweak is a small, well-scoped change that can be reverted with `claude-tweaks restore`.
