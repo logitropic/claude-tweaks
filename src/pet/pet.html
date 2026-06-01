@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="en" data-reaction-state="idle" data-motion-state="idle">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pet</title>
+  <style>
+    /* ============================================================
+       Tokens
+       ============================================================ */
+    :root {
+      color-scheme: light dark;
+      --pet-opacity: 1;
+      --play-state: running;
+
+      --sprite-row-y: 0px;
+      --sprite-frames: 6;
+      --sprite-duration: 5500ms;
+      --sprite-iterations: infinite;
+
+      --pet-scale: 0.72;
+      --pet-bottom: 22px;
+      --bubble-bottom: calc(22px + 208px * var(--pet-scale) + 8px);
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+    html { color: #172033; }
+    body {
+      -webkit-app-region: no-drag;
+      pointer-events: none;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      overflow: visible;
+    }
+
+    /* ============================================================
+       Pet shell
+       ============================================================ */
+    .pet-shell {
+      position: absolute;
+      left: 50%;
+      bottom: var(--pet-bottom);
+      width: calc(192px * var(--pet-scale));
+      height: calc(208px * var(--pet-scale));
+      z-index: 1;
+      transform: translateX(-50%);
+      opacity: var(--pet-opacity);
+      filter: drop-shadow(0 10px 12px rgba(15, 23, 42, 0.24)) drop-shadow(0 2px 3px rgba(15, 23, 42, 0.18));
+      transition: opacity 180ms cubic-bezier(0.2, 0, 0, 1), filter 180ms cubic-bezier(0.2, 0, 0, 1), transform 80ms ease-out;
+      pointer-events: auto;
+      -webkit-app-region: no-drag;
+      cursor: grab;
+    }
+    .pet-shell[data-dragging="true"],
+    .pet-shell:active {
+      cursor: grabbing;
+      transform: translateX(-50%) scale(1.04);
+      filter: drop-shadow(0 16px 22px rgba(15, 23, 42, 0.32)) drop-shadow(0 2px 4px rgba(15, 23, 42, 0.24));
+      transition-duration: 80ms;
+    }
+
+    .sprite {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 192px;
+      height: 208px;
+      background-image: url("./codex-spritesheet-v4.webp");
+      background-size: 1536px 1872px;
+      background-repeat: no-repeat;
+      background-position: 0 var(--sprite-row-y);
+      animation: pet-frames var(--sprite-duration) steps(var(--sprite-frames)) var(--sprite-iterations);
+      animation-play-state: var(--play-state);
+      image-rendering: pixelated;
+      transform: scale(var(--pet-scale));
+      transform-origin: top left;
+    }
+
+    @keyframes pet-frames {
+      from { background-position: 0 var(--sprite-row-y); }
+      to   { background-position: calc(-192px * var(--sprite-frames)) var(--sprite-row-y); }
+    }
+
+    /* ============================================================
+       Sprite state mapping (OpenPets-style)
+       9 states × rows 0..8
+       ============================================================ */
+    html[data-reaction-state="idle"] .sprite,
+    html[data-motion-state="idle"] .sprite {
+      --sprite-row-y: 0;
+      --sprite-frames: 6;
+      --sprite-duration: 5500ms;
+      --sprite-iterations: infinite;
+    }
+    html[data-reaction-state="running-right"] .sprite,
+    html[data-motion-state="run-right"] .sprite {
+      --sprite-row-y: -208px;
+      --sprite-frames: 8;
+      --sprite-duration: 1060ms;
+      --sprite-iterations: infinite;
+    }
+    html[data-reaction-state="running-left"] .sprite,
+    html[data-motion-state="run-left"] .sprite {
+      --sprite-row-y: -416px;
+      --sprite-frames: 8;
+      --sprite-duration: 1060ms;
+      --sprite-iterations: infinite;
+    }
+    html[data-reaction-state="waving"] .sprite {
+      --sprite-row-y: -624px;
+      --sprite-frames: 4;
+      --sprite-duration: 700ms;
+      --sprite-iterations: 2;
+    }
+    html[data-reaction-state="jumping"] .sprite {
+      --sprite-row-y: -832px;
+      --sprite-frames: 5;
+      --sprite-duration: 840ms;
+      --sprite-iterations: 2;
+    }
+    html[data-reaction-state="failed"] .sprite {
+      --sprite-row-y: -1040px;
+      --sprite-frames: 8;
+      --sprite-duration: 1220ms;
+      --sprite-iterations: 2;
+    }
+    html[data-reaction-state="waiting"] .sprite {
+      --sprite-row-y: -1248px;
+      --sprite-frames: 6;
+      --sprite-duration: 1010ms;
+      --sprite-iterations: infinite;
+    }
+    html[data-reaction-state="running"] .sprite {
+      --sprite-row-y: -1456px;
+      --sprite-frames: 6;
+      --sprite-duration: 820ms;
+      --sprite-iterations: infinite;
+    }
+    html[data-reaction-state="review"] .sprite {
+      --sprite-row-y: -1664px;
+      --sprite-frames: 6;
+      --sprite-duration: 1030ms;
+      --sprite-iterations: infinite;
+    }
+
+    /* ============================================================
+       Speech bubble
+       ============================================================ */
+    .bubble {
+      position: absolute;
+      left: 50%;
+      bottom: var(--bubble-bottom);
+      z-index: 4;
+      box-sizing: border-box;
+      display: inline-flex;
+      flex-direction: column;
+      width: fit-content;
+      min-width: 92px;
+      max-width: min(220px, calc(100vw - 18px));
+      max-height: 128px;
+      padding: 10px 12px;
+      background: linear-gradient(135deg, rgba(239, 246, 255, 0.97), rgba(237, 233, 254, 0.96));
+      color: #172033;
+      font: 760 11px/14px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-align: left;
+      border: 1px solid rgba(255, 255, 255, 0.78);
+      border-radius: 14px;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.16), 0 2px 5px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(10px);
+      transform: translateX(-50%);
+      transform-origin: 64% 100%;
+      animation: bubble-in 180ms cubic-bezier(0.2, 0, 0, 1);
+      pointer-events: auto;
+      -webkit-app-region: no-drag;
+      cursor: pointer;
+      overflow-wrap: break-word;
+      word-break: normal;
+    }
+    .bubble[hidden] { display: none; }
+    .bubble::after {
+      content: "";
+      position: absolute;
+      left: 64%;
+      bottom: -7px;
+      width: 12px;
+      height: 12px;
+      background: inherit;
+      border-right: 1px solid rgba(255, 255, 255, 0.56);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.56);
+      border-bottom-right-radius: 3px;
+      transform: translateX(-50%) rotate(45deg);
+      box-shadow: 3px 3px 7px rgba(15, 23, 42, 0.08);
+    }
+    .bubble-header {
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
+      gap: 7px;
+      color: currentColor;
+      font: 780 11px/14px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0.01em;
+    }
+    .bubble-status-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: #3b82f6;
+      color: #fff;
+      font-size: 10px;
+      line-height: 1;
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28), 0 2px 7px rgba(59, 130, 246, 0.3);
+    }
+    .bubble-status-icon::before { content: attr(data-icon); }
+    .bubble-status-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bubble-divider {
+      height: 1px;
+      width: 100%;
+      margin: 8px 0;
+      background: rgba(30, 58, 138, 0.12);
+    }
+    .bubble-body {
+      min-width: 0;
+      width: 100%;
+      color: #172033;
+      font: 720 10.5px/13.5px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .bubble-text {
+      display: -webkit-box;
+      min-width: 0;
+      overflow: hidden;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      text-wrap: normal;
+      overflow-wrap: break-word;
+    }
+    .bubble.is-status-only { max-width: min(156px, calc(100vw - 18px)); padding: 8px 11px; border-radius: 999px; }
+    .bubble.is-message-only { border-radius: 14px 14px 3px 14px; }
+    .bubble.is-long-message { max-width: min(220px, calc(100vw - 18px)); max-height: 138px; }
+    .bubble.is-long-message .bubble-text { -webkit-line-clamp: 6; font-size: 10px; line-height: 13px; }
+    .bubble.is-very-long-message { max-width: min(220px, calc(100vw - 18px)); max-height: 156px; }
+    .bubble.is-very-long-message .bubble-text { -webkit-line-clamp: 8; font-size: 9.5px; line-height: 12.5px; }
+
+    .bubble.is-busy .bubble-status-icon    { background: #3b82f6; box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28), 0 2px 7px rgba(59, 130, 246, 0.34); }
+    .bubble.is-waiting .bubble-status-icon { background: #f59e0b; box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28), 0 2px 7px rgba(245, 158, 11, 0.34); }
+    .bubble.is-success .bubble-status-icon { background: #10b981; box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28), 0 2px 7px rgba(16, 185, 129, 0.34); }
+    .bubble.is-error .bubble-status-icon   { background: #ef4444; box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28), 0 2px 7px rgba(239, 68, 68, 0.34); }
+    .bubble.is-info .bubble-status-icon    { background: #38bdf8; box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28), 0 2px 7px rgba(56, 189, 248, 0.34); }
+    .bubble.is-busy .bubble-status-icon::before { content: ""; display: block; width: 7px; height: 7px; border-radius: 999px; background: #fff; animation: status-pulse 820ms ease-in-out infinite; }
+
+    @keyframes bubble-in    { from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.96); } to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } }
+    @keyframes status-pulse { 0%, 100% { transform: scale(0.72); opacity: 0.58; } 50% { transform: scale(1); opacity: 1; } }
+
+    @media (prefers-color-scheme: dark) {
+      .bubble {
+        background: linear-gradient(135deg, rgba(30, 41, 75, 0.96), rgba(46, 32, 80, 0.95));
+        color: #f1f5f9;
+        border-color: rgba(255, 255, 255, 0.12);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.32), 0 2px 5px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+      .bubble-body { color: #f1f5f9; }
+      .bubble-divider { background: rgba(148, 163, 184, 0.18); }
+      .bubble::after { border-right-color: rgba(255, 255, 255, 0.12); border-bottom-color: rgba(255, 255, 255, 0.12); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sprite, .bubble, .bubble-status-icon::before { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main id="stage">
+    <div id="bubble" class="bubble" role="status" aria-live="polite" hidden></div>
+    <div class="pet-shell" id="petShell">
+      <div class="sprite" role="img" aria-label="Pet"></div>
+    </div>
+  </main>
+
+  <script>
+    const { ipcRenderer } = require("electron");
+
+    // === Constants ===
+    const TRANSIENT_DISPLAY_MS = 4000;
+    const MOTION_IDLE_TIMEOUT_MS = 180;
+    const DRAG_PIXEL_THRESHOLD = 4;
+    const MOTION_PIXEL_THRESHOLD = 3;
+    const THROW_VELOCITY_THRESHOLD = 200;
+    const THROW_VELOCITY_CAP = 3200;
+    const IDLE_CHATTER_COOLDOWN_MS = 8000;
+
+    // === Pet geometry ===
+    const SPRITE_WIDTH = 192;
+    const SPRITE_HEIGHT = 208;
+    const PET_BOTTOM = 22;
+    const SIDE_MARGIN = 14;
+    const BUBBLE_AREA = 80;
+
+    // === Scale presets (must match pet-main.cjs SCALE_PRESETS) ===
+    const SCALE_PRESETS = [
+      { id: "small",  scale: 0.56, label: "Small"  },
+      { id: "medium", scale: 0.72, label: "Medium" },
+      { id: "large",  scale: 1.00, label: "Large"  },
+    ];
+    const SCALE_BY_ID = Object.fromEntries(SCALE_PRESETS.map((p) => [p.id, p]));
+
+    // === Reaction message pools (verbatim from OpenPets) ===
+    const REACTION_POOLS = {
+      idle:        ["Ready", "Standing by", "Available", "Waiting", "On standby", "Idle", "Ready when needed", "Keeping watch"],
+      thinking:    ["Thinking", "Reviewing", "Checking context", "Planning", "Considering options", "Looking closer", "Tracing this", "Sorting it out"],
+      working:     ["Working", "In progress", "Handling task", "Making progress", "Processing", "Working through it", "Continuing work", "On the task"],
+      editing:     ["Editing", "Updating files", "Applying changes", "Adjusting code", "Refining changes", "Cleaning up", "Changing files", "Updating the diff"],
+      running:     ["Running command", "Command running", "Starting task", "Executing", "Running now", "Process started", "Task underway", "In motion"],
+      testing:     ["Testing", "Running checks", "Verifying", "Checking results", "Looking for failures", "Confirming behavior", "Checking regressions", "Validating fix"],
+      waiting:     ["Waiting for input", "Approval needed", "Paused for review", "Need a decision", "Waiting on you", "Ready for approval", "Paused", "Your call"],
+      waving:      ["Hello", "Checking in", "Attention needed", "Quick update", "Notice", "Over here", "Ping", "Heads up"],
+      success:     ["Done", "All set", "Success", "Finished", "Complete", "Checks passed", "Ready", "Good to go"],
+      error:       ["Error", "Failed", "Needs attention", "Issue found", "Check failed", "Problem detected", "Not complete", "Review needed"],
+      celebrating: ["Celebrating", "Nice work", "Win confirmed", "Great result", "Success moment", "That worked", "Finished well", "Victory"]
+    };
+
+    // === Reaction → sprite state mapping ===
+    const REACTION_TO_SPRITE = {
+      idle:        "idle",
+      thinking:    "review",
+      working:     "running",
+      editing:     "running",
+      running:     "running",
+      testing:     "waiting",
+      waiting:     "waiting",
+      waving:      "waving",
+      success:     "jumping",
+      error:       "failed",
+      celebrating: "jumping"
+    };
+
+    // === Status badge map (color/icon/label per reaction) ===
+    const STATUS_MAP = {
+      thinking:    { className: "is-busy",    icon: "",   label: "Thinking" },
+      working:     { className: "is-busy",    icon: "",   label: "Working"  },
+      editing:     { className: "is-busy",    icon: "",   label: "Editing"  },
+      running:     { className: "is-busy",    icon: "",   label: "Working"  },
+      testing:     { className: "is-busy",    icon: "",   label: "Testing"  },
+      waiting:     { className: "is-waiting", icon: "◷", label: "Waiting"  },
+      success:     { className: "is-success", icon: "✓", label: "Done"     },
+      celebrating: { className: "is-success", icon: "✓", label: "Done"     },
+      error:       { className: "is-error",   icon: "!", label: "Oops"     },
+      waving:      { className: "is-info",    icon: "♪", label: "Hi"       }
+    };
+
+    // === Per-sprite-state total duration + iteration count (for auto-revert) ===
+    const SPRITE_META = {
+      "idle":          { durationMs: 5500, iterations: Infinity },
+      "running-right": { durationMs: 1060, iterations: Infinity },
+      "running-left":  { durationMs: 1060, iterations: Infinity },
+      "waving":        { durationMs: 700,  iterations: 2        },
+      "jumping":       { durationMs: 840,  iterations: 2        },
+      "failed":        { durationMs: 1220, iterations: 2        },
+      "waiting":       { durationMs: 1010, iterations: Infinity },
+      "running":       { durationMs: 820,  iterations: Infinity },
+      "review":        { durationMs: 1030, iterations: Infinity }
+    };
+
+    // === DOM ===
+    const root       = document.documentElement;
+    const stage      = document.getElementById("stage");
+    const petShell   = document.getElementById("petShell");
+    const sprite     = petShell.querySelector(".sprite");
+    const bubble     = document.getElementById("bubble");
+
+    // === State ===
+    const state = {
+      scale: "medium",
+      reaction: "idle",
+      motion: "idle",
+      drag: null,
+      pointerInteractive: false,
+      keyboardInteractive: false,
+      reactionResetTimer: null,
+      bubbleHideTimer: null,
+      motionIdleTimer: null,
+      lastIdleChatter: 0,
+      dragMovePending: false,
+      dragMoveLastX: 0,
+      dragMoveLastY: 0,
+    };
+
+    // === Utils ===
+    function escapeHtml(s) {
+      return String(s || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+    function pickReactionMessage(reaction) {
+      const pool = REACTION_POOLS[reaction];
+      if (!pool || !pool.length) return reaction;
+      return pool[Math.floor(Math.random() * pool.length) % pool.length] || reaction;
+    }
+    function bubbleLengthClass(text) {
+      if (text.length > 95) return " is-very-long-message";
+      if (text.length > 56) return " is-long-message";
+      return "";
+    }
+    function sanitizeMarkdown(text) {
+      return String(text || "")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/^#{1,6}\s+/gm, "")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/__([^_]+)__/g, "$1")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\*([^*]+)\*/g, "$1")
+        .replace(/_([^_]+)_/g, "$1")
+        .replace(/^[\s>*-]*[-*+]\s+/gm, "")
+        .replace(/[~>#]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80);
+    }
+
+    // === Pet state ===
+    function setReaction(reaction) {
+      if (!REACTION_POOLS[reaction]) reaction = "idle";
+      if (state.reaction === reaction) return;
+      state.reaction = reaction;
+      root.dataset.reactionState = REACTION_TO_SPRITE[reaction] || "idle";
+      scheduleReactionReset();
+    }
+    function setMotion(motion) {
+      if (state.motion === motion) return;
+      state.motion = motion;
+      root.dataset.motionState = motion;
+      if (state.motionIdleTimer) {
+        clearTimeout(state.motionIdleTimer);
+        state.motionIdleTimer = null;
+      }
+      if (motion !== "idle") {
+        state.motionIdleTimer = setTimeout(() => {
+          state.motionIdleTimer = null;
+          setMotion("idle");
+        }, MOTION_IDLE_TIMEOUT_MS);
+      }
+    }
+    function scheduleReactionReset() {
+      if (state.reactionResetTimer) {
+        clearTimeout(state.reactionResetTimer);
+        state.reactionResetTimer = null;
+      }
+      const spriteState = REACTION_TO_SPRITE[state.reaction];
+      const meta = SPRITE_META[spriteState];
+      if (!meta || meta.iterations === Infinity) return;
+      const resetMs = meta.durationMs * meta.iterations + 50;
+      state.reactionResetTimer = setTimeout(() => {
+        state.reactionResetTimer = null;
+        if (state.reaction !== "idle") setReaction("idle");
+      }, resetMs);
+    }
+
+    // === Bubble ===
+    function showBubble({ text, status, isExplicit = false, durationMs = TRANSIENT_DISPLAY_MS } = {}) {
+      const hasText = Boolean(text);
+      const hasStatus = Boolean(status);
+      if (!hasText && !hasStatus) return hideBubble();
+      let className = "bubble";
+      if (hasStatus) {
+        className += hasText
+          ? ` is-message ${status.className}${isExplicit ? bubbleLengthClass(text) : ""}`
+          : ` is-status-only ${status.className}`;
+      } else {
+        className += ` is-message-only${isExplicit ? bubbleLengthClass(text) : ""}`;
+      }
+      const header = hasStatus
+        ? `<div class="bubble-header"><span class="bubble-status-icon" data-icon="${escapeHtml(status.icon)}" aria-hidden="true"></span><span class="bubble-status-label">${escapeHtml(status.label)}</span></div>`
+        : "";
+      const divider = hasStatus && hasText ? `<div class="bubble-divider" aria-hidden="true"></div>` : "";
+      const body = hasText ? `<div class="bubble-body"><span class="bubble-text">${escapeHtml(text)}</span></div>` : "";
+      bubble.className = className;
+      bubble.innerHTML = header + divider + body;
+      bubble.hidden = false;
+      if (state.bubbleHideTimer) clearTimeout(state.bubbleHideTimer);
+      state.bubbleHideTimer = setTimeout(hideBubble, durationMs);
+    }
+    function hideBubble() {
+      bubble.hidden = true;
+      if (state.bubbleHideTimer) {
+        clearTimeout(state.bubbleHideTimer);
+        state.bubbleHideTimer = null;
+      }
+    }
+    function showIdleChatter() {
+      const now = Date.now();
+      if (now - state.lastIdleChatter < IDLE_CHATTER_COOLDOWN_MS) return;
+      const line = pickReactionMessage("idle");
+      if (line) {
+        showBubble({ text: line, status: STATUS_MAP.idle, isExplicit: true });
+        state.lastIdleChatter = now;
+      }
+    }
+
+    // === Scale ===
+    function applyScale(scaleId, { skipResize = false } = {}) {
+      const preset = SCALE_BY_ID[scaleId];
+      if (!preset) return;
+      state.scale = scaleId;
+      root.style.setProperty("--pet-scale", String(preset.scale));
+      if (skipResize) return;
+      const shellW = Math.round(SPRITE_WIDTH * preset.scale);
+      const shellH = Math.round(SPRITE_HEIGHT * preset.scale);
+      const width = Math.max(220, shellW + 2 * SIDE_MARGIN);
+      const height = PET_BOTTOM + shellH + 8 + BUBBLE_AREA;
+      ipcRenderer.send("pet:resize", { width, height });
+    }
+
+    // === Interactivity IPC ===
+    function setPointerInteractive(value) {
+      if (state.pointerInteractive === value) return;
+      state.pointerInteractive = value;
+      ipcRenderer.send("pet:pointer-interactive", value);
+    }
+    function setKeyboardInteractive(value) {
+      if (state.keyboardInteractive === value) return;
+      state.keyboardInteractive = value;
+      ipcRenderer.send("pet:keyboard-interactive", value);
+    }
+
+    // === Drag ===
+    function onPointerDown(e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      petShell.setPointerCapture(e.pointerId);
+      state.drag = {
+        pointerId: e.pointerId,
+        hasMoved: false,
+        samples: [{ x: e.screenX, y: e.screenY, t: e.timeStamp }],
+        startScreenX: e.screenX,
+        startScreenY: e.screenY,
+        lastX: e.screenX,
+        lastY: e.screenY,
+      };
+      setPointerInteractive(true);
+      petShell.dataset.dragging = "true";
+      ipcRenderer.send("pet:drag-start", { screenX: e.screenX, screenY: e.screenY });
+    }
+    function onPointerMove(e) {
+      if (!state.drag || state.drag.pointerId !== e.pointerId) return;
+      e.preventDefault();
+      const d = state.drag;
+      d.samples.push({ x: e.screenX, y: e.screenY, t: e.timeStamp });
+      d.samples = d.samples.filter((s) => e.timeStamp - s.t <= 160);
+      // Cumulative delta (from drag start) — used to detect "drag actually started"
+      const cumDx = e.screenX - d.startScreenX;
+      const cumDy = e.screenY - d.startScreenY;
+      // Instantaneous delta (from previous pointer event) — used for motion direction
+      const instDx = e.screenX - d.lastX;
+      if (Math.abs(cumDx) >= DRAG_PIXEL_THRESHOLD || Math.abs(cumDy) >= DRAG_PIXEL_THRESHOLD) {
+        d.hasMoved = true;
+        if (Math.abs(instDx) >= MOTION_PIXEL_THRESHOLD) {
+          setMotion(instDx > 0 ? "run-right" : "run-left");
+        }
+        scheduleDragMove(e.screenX, e.screenY);
+      }
+      d.lastX = e.screenX;
+      d.lastY = e.screenY;
+    }
+    function onPointerUp(e, shouldThrow) {
+      if (!state.drag || state.drag.pointerId !== e.pointerId) return;
+      e.preventDefault();
+      const d = state.drag;
+      state.drag = null;
+      delete petShell.dataset.dragging;
+      ipcRenderer.send("pet:drag-end", {});
+      if (shouldThrow && d.hasMoved) {
+        const v = computeVelocity(d.samples);
+        if (v.vx || v.vy) ipcRenderer.send("pet:drag-release", v);
+      } else if (!d.hasMoved) {
+        // Click: random idle chatter
+        showIdleChatter();
+      }
+      setMotion("idle");
+    }
+    function computeVelocity(samples) {
+      const latest = samples[samples.length - 1];
+      if (!latest) return { vx: 0, vy: 0 };
+      const windowMs = 50;
+      let earlier = samples.find((s) => latest.t - s.t > windowMs);
+      if (!earlier && samples.length >= 2) earlier = samples[samples.length - 2];
+      if (!earlier || earlier === latest) return { vx: 0, vy: 0 };
+      const seconds = (latest.t - earlier.t) / 1e3;
+      if (seconds <= 0) return { vx: 0, vy: 0 };
+      const vx = (latest.x - earlier.x) / seconds;
+      const vy = (latest.y - earlier.y) / seconds;
+      const speed = Math.hypot(vx, vy);
+      if (speed < THROW_VELOCITY_THRESHOLD) return { vx: 0, vy: 0 };
+      const cap = speed > THROW_VELOCITY_CAP ? THROW_VELOCITY_CAP / speed : 1;
+      return { vx: Math.round(vx * cap), vy: Math.round(vy * cap) };
+    }
+    function scheduleDragMove(x, y) {
+      state.dragMoveLastX = x;
+      state.dragMoveLastY = y;
+      if (state.dragMovePending) return;
+      state.dragMovePending = true;
+      window.requestAnimationFrame(() => {
+        state.dragMovePending = false;
+        ipcRenderer.send("pet:drag-move", { screenX: state.dragMoveLastX, screenY: state.dragMoveLastY });
+      });
+    }
+
+    // === Chat event → reaction mapping ===
+    function handleChatEvent(payload) {
+      if (!payload || !payload.type) return;
+      switch (payload.type) {
+        case "chat:user-message":
+          setReaction("waiting");
+          showBubble({ status: STATUS_MAP.waiting });
+          break;
+        case "chat:assistant-start":
+          setReaction("thinking");
+          showBubble({ status: STATUS_MAP.thinking });
+          break;
+        case "chat:assistant-update":
+          setReaction("working");
+          showBubble({ status: STATUS_MAP.working });
+          break;
+        case "chat:assistant-done": {
+          const snippet = sanitizeMarkdown(payload.body || "");
+          setReaction("success");
+          showBubble({ text: snippet, status: STATUS_MAP.success, isExplicit: true });
+          break;
+        }
+        case "chat:error":
+          setReaction("error");
+          showBubble({ status: STATUS_MAP.error });
+          break;
+      }
+    }
+
+    // === Event wiring ===
+    petShell.addEventListener("pointerenter", () => setPointerInteractive(true));
+    petShell.addEventListener("pointerleave", () => {
+      if (!state.drag) setPointerInteractive(false);
+    });
+    petShell.addEventListener("pointerdown", onPointerDown);
+    petShell.addEventListener("pointermove", onPointerMove);
+    petShell.addEventListener("pointerup",    (e) => onPointerUp(e, true));
+    petShell.addEventListener("pointercancel",(e) => onPointerUp(e, false));
+
+    bubble.addEventListener("pointerenter", () => setPointerInteractive(true));
+    bubble.addEventListener("pointerleave", () => {
+      if (!state.drag) setPointerInteractive(false);
+    });
+    bubble.addEventListener("click", hideBubble);
+
+    document.addEventListener("focusin", (e) => {
+      if (e.target.closest && e.target.closest(".pet-shell, .bubble")) {
+        setKeyboardInteractive(true);
+      }
+    });
+    document.addEventListener("focusout", () => {
+      setTimeout(() => {
+        const a = document.activeElement;
+        if (!a || !a.closest || !a.closest(".pet-shell, .bubble")) {
+          setKeyboardInteractive(false);
+        }
+      }, 0);
+    });
+
+    // === IPC subscriptions (from main) ===
+    ipcRenderer.on("pet:motion-state", (_e, motion) => {
+      if (motion === "idle" || motion === "run-left" || motion === "run-right") {
+        setMotion(motion);
+      }
+    });
+    ipcRenderer.on("pet:chat-event", (_e, payload) => handleChatEvent(payload));
+    ipcRenderer.on("pet:open-state", (_e, isOpen) => {
+      document.body.dataset.overlayOpen = isOpen ? "true" : "false";
+    });
+    ipcRenderer.on("pet:scale", (_e, scaleId) => {
+      applyScale(scaleId);
+    });
+
+    // === Init ===
+    applyScale(state.scale, { skipResize: true });
+    setReaction("idle");
+    setMotion("idle");
+  </script>
+</body>
+</html>

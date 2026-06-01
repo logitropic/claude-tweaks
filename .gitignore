@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.DS_Store?
+
+# Test artifacts
+coverage/
+.nyc_output/
+
+# Backup files (created by the patcher at runtime; should never be committed)
+*.pre-gateway-bypass.bak
+
+# Local state files
+claude-pet-state.json

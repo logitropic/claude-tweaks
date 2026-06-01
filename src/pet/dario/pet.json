@@ -1,0 +1,14 @@
+{
+  "id": "dario",
+  "displayName": "Dario",
+  "description": "A tiny frustrated Codex pet inspired by Dario, CEO of Anthropic, with curly dark hair, black glasses, furrowed brow, and skeptical grimace.",
+  "spritesheetPath": "spritesheet.webp",
+  "lines": {
+    "greeting": ["Hey.", "Hi there.", "What's up?"],
+    "thinking": ["Hmm, let me think…", "Working on it.", "Bear with me."],
+    "complete": ["Done.", "All set.", "There you go."],
+    "idle": ["…", "Still here.", "Quiet day.", "Just chilling.", "Waiting on you."],
+    "drag": ["Whoa.", "Hey.", "Easy.", "Not so rough."],
+    "error": ["Oops.", "Hmm, that broke.", "Something's off."]
+  }
+}
