@@ -77,6 +77,16 @@ npx github:logitropic/claude-tweaks restore
 
 Backups are stored next to the original files as `<file>.pre-gateway-bypass.bak`.
 
+## Gateway route troubleshooting
+
+If your third-party inference setup fails with this Claude Desktop gateway validation message:
+
+```text
+expected a gateway model route referencing an Anthropic model (e.g. claude-sonnet-4-5, anthropic/claude-*). Name routes to match the underlying model.
+```
+
+the route name is being checked against Claude Desktop's built-in gateway model validator. The `inference-3p` tweak adjusts that validation path for compatible third-party provider setups, so Anthropic-compatible model routes can be tested without the desktop app blocking the request before it reaches your provider.
+
 ## How it works
 
 `claude-tweaks` reads Claude's `app.asar` (an Electron archive), parses its JSON header to locate the right file (`.vite/build/index.pre.js` for the main tweaks), performs a same-length byte-pattern replacement to inject the new code, recomputes the header SHA256, and patches every `Info.plist` that references the new integrity hash.

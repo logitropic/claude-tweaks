@@ -25,8 +25,10 @@
     "patcher",
     "asar",
     "electron",
+    "gateway",
     "3p",
     "inference",
+    "third-party-inference",
     "computer-use"
   ],
   "files": [
