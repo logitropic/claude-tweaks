@@ -1,8 +1,7 @@
 {
   "name": "claude-tweaks",
   "version": "0.1.0",
-  "description": "A patcher for Claude for Desktop on macOS that adds tweaks via in-place modification of the app.asar bundle. Recommended for use with 3P inference providers.",
-  "private": true,
+  "description": "Reversible macOS patcher for Claude Desktop ASAR tweaks, including third-party inference routing, Computer Use experiments, and an optional desktop pet overlay.",
   "type": "module",
   "license": "MIT",
   "author": "logitropic",
@@ -14,21 +13,37 @@
     "url": "https://github.com/logitropic/claude-tweaks/issues"
   },
   "homepage": "https://github.com/logitropic/claude-tweaks#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "claude",
     "anthropic",
+    "claude-desktop",
     "desktop",
+    "macos",
     "patcher",
     "asar",
     "electron",
     "3p",
-    "inference"
+    "inference",
+    "computer-use"
+  ],
+  "files": [
+    "claude-tweaks.ts",
+    "src",
+    "README.md",
+    "LICENSE",
+    "CONTRIBUTING.md"
+  ],
+  "os": [
+    "darwin"
   ],
   "engines": {
     "node": ">=22"
   },
   "bin": {
-    "claude-tweaks": "./claude-tweaks"
+    "claude-tweaks": "./claude-tweaks.ts"
   },
   "scripts": {
     "cli": "node --experimental-strip-types claude-tweaks.ts",

@@ -1,8 +1,16 @@
 # claude-tweaks
 
-> A patcher for [Claude for Desktop](https://claude.com/download) on macOS that adds tweaks via in-place modification of the app's `app.asar` bundle.
+> Reversible macOS patcher for Claude Desktop that applies focused ASAR-level tweaks for third-party inference routing, Computer Use experiments, and an optional desktop pet overlay.
 
-**Recommended only when using third-party (3P) inference providers.** If you use Claude with Anthropic's default API, you don't need any of these tweaks.
+![Platform: macOS](https://img.shields.io/badge/platform-macOS-111111)
+![Node.js >= 22](https://img.shields.io/badge/node-%3E%3D22-339933)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+
+`claude-tweaks` is a small, dependency-free CLI for advanced Claude Desktop users who need inspectable, reversible patches while experimenting with compatible third-party inference providers on macOS.
+
+If you use Claude Desktop with Anthropic's default service, you probably do not need this project.
+
+This project is not affiliated with Anthropic.
 
 ## Demo
 
@@ -10,51 +18,64 @@
 
 <https://youtu.be/aYqx4Ogf-7w>
 
-## What it does
+## Features
 
-`claude-tweaks` modifies `Claude.app/Contents/Resources/app.asar` to install one or more of these tweaks. Each tweak is a small, well-scoped change that can be reverted with `claude-tweaks restore`.
+`claude-tweaks` modifies `Claude.app/Contents/Resources/app.asar` to install one tweak at a time. Each tweak is intentionally scoped and can be reverted with `claude-tweaks restore`.
 
-| Tweak | What it does |
-|---|---|
-| `inference-3p` | Bypasses the Claude gateway route verification, the Cowork prompt forwarding check, and the Electron UI gateway warning. **Required when routing inference through a 3P provider.** |
-| `computer-use-3p` | Unlocks the Computer Use feature even when it is gated behind the platform, opt-out, disabled, or TCC permission checks. **Required when using Computer Use through a 3P provider.** |
-| `pet` | Adds a floating Codex-style mascot overlay (sprite + speech bubble) that reacts to Claude activity. Cosmetic. |
+| Tweak | Purpose | Notes |
+|---|---|---|
+| `inference-3p` | Adjusts Claude Desktop's gateway route validation, Cowork prompt forwarding check, and Electron UI gateway warning. | Intended for routing inference through compatible third-party providers. |
+| `computer-use-3p` | Enables Computer Use paths that can be gated by platform, opt-out, disabled, or local permission checks. | Intended for third-party-provider experiments where Computer Use support is expected. |
+| `pet` | Adds a floating Codex-style desktop pet overlay with a sprite and speech bubble. | Cosmetic; works independently of the inference provider. |
 
 The patcher also recomputes the `ElectronAsarIntegrity` SHA256 hashes stored in every `Info.plist` inside `Claude.app`, so Claude's own integrity checks stay consistent.
 
-## Install
+## Quick start
 
-You need macOS, Node.js ≥ 22 (for `--experimental-strip-types`), and a Claude for Desktop install at `/Applications/Claude.app` (or pass `--app` to point elsewhere).
+Requirements:
 
-```bash
-# Recommended: install via npx without cloning
-npx claude-tweaks install inference-3p
-npx claude-tweaks install pet
-npx claude-tweaks install computer-use-3p
-
-# Combine
-npx claude-tweaks install inference-3p pet
-```
-
-After installing, **quit and reopen Claude** for the changes to take effect.
-
-### Dry run
-
-Preview what the patcher will do without touching any files:
+- macOS
+- Node.js >= 22
+- Claude Desktop installed at `/Applications/Claude.app`, or a custom path passed with `--app`
+- Claude Desktop fully quit before patching
 
 ```bash
-npx claude-tweaks install inference-3p --dry-run
+# Preview the patch without writing files
+npx github:logitropic/claude-tweaks install inference-3p --dry-run
+
+# Install one tweak
+npx github:logitropic/claude-tweaks install inference-3p
+
+# Install additional tweaks by running the command again
+npx github:logitropic/claude-tweaks install computer-use-3p
+npx github:logitropic/claude-tweaks install pet
 ```
 
-### Restore
+After installing, reopen Claude Desktop for the changes to take effect.
 
-Revert every tweak and restore the original `app.asar` plus all backed-up `Info.plist` files:
+### From a local checkout
 
 ```bash
-npx claude-tweaks restore
+git clone https://github.com/logitropic/claude-tweaks.git
+cd claude-tweaks
+npm run cli -- install inference-3p --dry-run
+npm run cli -- install inference-3p
 ```
 
-Backups are stored as `<file>.pre-gateway-bypass.bak` next to the original.
+## Commands
+
+```bash
+npx github:logitropic/claude-tweaks install <inference-3p|computer-use-3p|pet> [--app /Applications/Claude.app] [--dry-run]
+npx github:logitropic/claude-tweaks restore [--app /Applications/Claude.app] [--dry-run]
+```
+
+Restore reverts every tweak and restores the original `app.asar` plus backed-up `Info.plist` files:
+
+```bash
+npx github:logitropic/claude-tweaks restore
+```
+
+Backups are stored next to the original files as `<file>.pre-gateway-bypass.bak`.
 
 ## How it works
 
@@ -62,17 +83,18 @@ Backups are stored as `<file>.pre-gateway-bypass.bak` next to the original.
 
 For the `pet` tweak, it additionally copies `pet-main.cjs`, `pet.html`, and the sprite into `Claude.app/Contents/Resources/claude-pet/`, and hooks Claude's main process by replacing a benign `require("node:events"); require("process"); require("crypto");` triple in `index.pre.js` with `require(process.resourcesPath+"/claude-pet/pet-main.cjs");`.
 
-## Why only with a 3P inference provider?
+## When to use it
 
-The `inference-3p` and `computer-use-3p` tweaks are specifically for routing Claude's requests through a third-party inference provider instead of Anthropic's own API gateway. If you use Claude normally, none of these tweaks are needed and the patched Claude will behave the same as the unpatched one.
+The `inference-3p` and `computer-use-3p` tweaks are specifically for advanced workflows that route Claude Desktop requests through a third-party inference provider instead of Anthropic's own gateway. If you use Claude normally, these tweaks are unnecessary.
 
 The `pet` tweak is purely cosmetic and works regardless of the inference provider.
 
-## Caveats
+## Safety and compatibility
 
-- **Modifying `app.asar` is not supported by Anthropic.** Future Claude updates may break the patcher or change the file layout. If a Claude update breaks the patcher, the affected `dry-run` will report `skip ... pattern not found` and no changes will be made.
-- **Backup first.** The patcher creates `.pre-gateway-bypass.bak` files for every modified file. Keep them until you've confirmed Claude still works as expected.
-- **macOS only.** The patcher targets `Claude.app` on macOS. Windows and Linux support is not provided.
+- Modifying `app.asar` is not supported by Anthropic. Claude Desktop updates may change the file layout or patch patterns.
+- Run `--dry-run` first. If a pattern is missing, the patcher reports the skipped step instead of guessing.
+- Keep the generated `.pre-gateway-bypass.bak` files until you have confirmed Claude Desktop still works as expected.
+- This project targets macOS only. Windows and Linux support is not currently provided.
 
 ## Development
 
@@ -86,10 +108,12 @@ npm run cli -- install pet --dry-run
 
 The project uses Node's built-in TypeScript stripping (no build step, no transpiler, no dependencies). All source files are TypeScript with `.ts` extensions and import each other with explicit `.ts` suffixes.
 
+## Contributing
+
+Issues and pull requests are welcome. Please run `npm run check` and include the `--dry-run` output for any tweak you change or add.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, project layout, testing guidance, and the pull request process.
+
 ## License
 
 [MIT](LICENSE)
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
