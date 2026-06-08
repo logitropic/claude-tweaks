@@ -125,7 +125,7 @@ function findMainGatewayDispatch(content: Buffer, log: PatchContext["log"]): Buf
   const windowStart = Math.max(0, reasonIndex - 800);
   const windowEnd = Math.min(text.length, reasonIndex + 1400);
   const windowText = text.slice(windowStart, windowEnd);
-  const matches = [...windowText.matchAll(/case"gateway":return [A-Za-z_$][\w$]*\(A\)/g)];
+  const matches = [...windowText.matchAll(/case"gateway":return [A-Za-z_$][\w$]*\([A-Za-z_$][\w$]*\)/g)];
   if (matches.length !== 1) {
     throw new Error(`Expected exactly one gateway dispatch near main reason, got ${matches.length}`);
   }
