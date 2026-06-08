@@ -22,6 +22,13 @@ const UI_NEW = 'case"gateway":return{ok:!0};}';
 const UI_PATCHED = 'case"gateway":return{ok:!0};}';
 const SYSTEM_PROMPT_OLD = Buffer.from("systemPrompt:Be");
 const SYSTEM_PROMPT_NEW = Buffer.from("systemPrompt:[]");
+const MODEL_FILTER_OLD = Buffer.from(
+  "function w6(A){const e=A.toLowerCase();return Fyi.test(e)?!1:HqA.test(e)||Uyi.some(t=>e.includes(t))}",
+);
+const MODEL_FILTER_NEW = Buffer.from(
+  "function w6(A){const e=A.toLowerCase();return HqA.test(e)||Uyi.some(t=>e.includes(t))||!0           }",
+);
+const MODEL_FILTER_PATCHED = MODEL_FILTER_NEW;
 
 export function patchInference(ctx: PatchContext): Buffer {
   const { data, fileStart, node, dryRun, asarPath, ensureBackup, log } = ctx;
@@ -39,6 +46,23 @@ export function patchInference(ctx: PatchContext): Buffer {
     patched.copy(data, fileStart);
     content = patched;
     refreshIntegrity(node, patched);
+  }
+
+  if (content.includes(MODEL_FILTER_PATCHED)) {
+    log("app.asar w6 model filter already bypassed");
+  } else {
+    const count = countBuffer(content, MODEL_FILTER_OLD);
+    if (count === 0) {
+      log("skip w6 model filter patch; pattern not found in this version");
+    } else {
+      if (count !== 1) throw new Error(`Expected exactly one w6 model filter, got ${count}`);
+      ensureBackup(asarPath, dryRun);
+      const patched = replaceBufferOnce(content, MODEL_FILTER_OLD, MODEL_FILTER_NEW);
+      patched.copy(data, fileStart);
+      content = patched;
+      refreshIntegrity(node, patched);
+      log("bypass w6 model filter (allow all model names)");
+    }
   }
 
   if (content.includes(SYSTEM_PROMPT_NEW)) {
