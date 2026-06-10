@@ -1,14 +1,16 @@
+import { patchChromeMcp } from "./features/chrome-mcp.ts";
 import { patchComputerUse } from "./features/computer-use.ts";
 import { patchConnectors } from "./features/connectors.ts";
 import { patchInference, patchIonDist } from "./features/inference.ts";
 import { patchPet, patchPetResources } from "./features/pet.ts";
 import type { PatchContext } from "./patch-utils.ts";
 
-export type TweakName = "inference-3p" | "computer-use-3p" | "connectors-3p" | "pet";
+export type TweakName = "inference-3p" | "computer-use-3p" | "connectors-3p" | "chrome-mcp-off" | "pet";
 
 export type Feature = {
   label: TweakName;
   asarFile?: string;
+  repackAsar?: boolean;
   patchIndexJs: (ctx: PatchContext) => Buffer;
   patchAfterAsar?: (app: string, dryRun: boolean, ensureBackup: PatchContext["ensureBackup"], log: PatchContext["log"]) => void;
 };
@@ -27,6 +29,11 @@ export const FEATURES: Record<TweakName, Feature> = {
     label: "connectors-3p",
     patchIndexJs: patchConnectors,
   },
+  "chrome-mcp-off": {
+    label: "chrome-mcp-off",
+    repackAsar: true,
+    patchIndexJs: patchChromeMcp,
+  },
   pet: {
     label: "pet",
     asarFile: ".vite/build/index.pre.js",
@@ -36,5 +43,11 @@ export const FEATURES: Record<TweakName, Feature> = {
 };
 
 export function isTweakName(value: string | undefined): value is TweakName {
-  return value === "inference-3p" || value === "computer-use-3p" || value === "connectors-3p" || value === "pet";
+  return (
+    value === "inference-3p" ||
+    value === "computer-use-3p" ||
+    value === "connectors-3p" ||
+    value === "chrome-mcp-off" ||
+    value === "pet"
+  );
 }

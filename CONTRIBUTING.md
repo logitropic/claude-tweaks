@@ -31,7 +31,9 @@ src/
   patch-utils.ts        Byte-pattern patching + SHA256 helpers
   features.ts           Feature registry (TweakName union + FEATURES map)
   features/
+    chrome-mcp.ts       chrome-mcp-off patcher
     computer-use.ts     computer-use-3p patcher
+    connectors.ts       connectors-3p patcher
     inference.ts        inference-3p patcher
     pet.ts              pet patcher (copies runtime files to Claude.app)
   pet/

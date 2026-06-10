@@ -1,7 +1,7 @@
 #!/usr/bin/env -S node --experimental-strip-types
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { getNode, readAsarHeader } from "./src/asar.ts";
+import { getNode, readAsarHeader, repackAsarFile } from "./src/asar.ts";
 import { FEATURES, isTweakName, type TweakName } from "./src/features.ts";
 import { sha256 } from "./src/patch-utils.ts";
 
@@ -12,7 +12,7 @@ type Command =
 
 function usage(): never {
   console.log(`Usage:
-  claude-tweaks install <inference-3p|computer-use-3p|connectors-3p|pet> [--app /Applications/Claude.app] [--dry-run]
+  claude-tweaks install <inference-3p|computer-use-3p|connectors-3p|chrome-mcp-off|pet> [--app /Applications/Claude.app] [--dry-run]
   claude-tweaks restore [--app /Applications/Claude.app] [--dry-run]
 
 Legacy/direct invocation:
@@ -20,6 +20,7 @@ Legacy/direct invocation:
   ./claude-tweaks.ts inference-3p [--app /Applications/Claude.app] [--dry-run]
   ./claude-tweaks.ts computer-use-3p [--app /Applications/Claude.app] [--dry-run]
   ./claude-tweaks.ts connectors-3p [--app /Applications/Claude.app] [--dry-run]
+  ./claude-tweaks.ts chrome-mcp-off [--app /Applications/Claude.app] [--dry-run]
   ./claude-tweaks.ts pet [--app /Applications/Claude.app] [--dry-run]
   ./claude-tweaks.ts --restore [--app /Applications/Claude.app] [--dry-run]
 
@@ -27,6 +28,7 @@ What it patches:
   - inference-3p: gateway route verification, Cowork prompt forwarding, Electron UI gateway warning, ElectronAsarIntegrity hashes
   - computer-use-3p: Computer Use feature, opt-out, disabled, and TCC gates, plus ElectronAsarIntegrity hashes
   - connectors-3p: custom 3P MCP discovery imports installed org-plugin connectors, plus ElectronAsarIntegrity hashes
+  - chrome-mcp-off: disables Claude in Chrome MCP bridge startup, tool-list exposure, and bundled prompt references, plus ElectronAsarIntegrity hashes
   - pet: floating Codex mascot overlay for Claude, plus ElectronAsarIntegrity hashes
   - restore: backups created by this tool
 `);
@@ -109,6 +111,7 @@ function patchAsar(app: string, dryRun: boolean, tweak: TweakName): string {
   if (!existsSync(asarPath)) fail(`Missing ${asarPath}`);
 
   const data = Buffer.from(readFileSync(asarPath));
+  const originalData = Buffer.from(data);
   const meta = readAsarHeader(data);
   const feature = FEATURES[tweak];
   const asarFile = feature.asarFile ?? ".vite/build/index.js";
@@ -131,6 +134,21 @@ function patchAsar(app: string, dryRun: boolean, tweak: TweakName): string {
     log,
   });
 
+  if (feature.repackAsar) {
+    if (content.equals(data.subarray(fileStart, fileEnd))) {
+      const headerJson = Buffer.from(JSON.stringify(meta.header));
+      const headerHash = sha256(headerJson);
+      log(`new ElectronAsarIntegrity header hash: ${headerHash}`);
+      log("app.asar unchanged");
+      return headerHash;
+    }
+    ensureBackup(asarPath, dryRun);
+    const rebuilt = repackAsarFile(data, asarFile, content);
+    log(`new ElectronAsarIntegrity header hash: ${rebuilt.headerHash}`);
+    if (!dryRun) writeFileSync(asarPath, rebuilt.data);
+    return rebuilt.headerHash;
+  }
+
   const newHeaderJson = Buffer.from(JSON.stringify(meta.header));
   if (newHeaderJson.length !== meta.jsonSize) {
     fail(`ASAR header size changed (${meta.jsonSize} -> ${newHeaderJson.length}); refusing in-place rewrite`);
@@ -139,6 +157,10 @@ function patchAsar(app: string, dryRun: boolean, tweak: TweakName): string {
   const headerHash = sha256(newHeaderJson);
 
   log(`new ElectronAsarIntegrity header hash: ${headerHash}`);
+  if (data.equals(originalData)) {
+    log("app.asar unchanged");
+    return headerHash;
+  }
   if (!dryRun) writeFileSync(asarPath, data);
   return headerHash;
 }
