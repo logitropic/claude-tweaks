@@ -12,19 +12,21 @@ type Command =
 
 function usage(): never {
   console.log(`Usage:
-  claude-tweaks install <inference-3p|computer-use-3p|pet> [--app /Applications/Claude.app] [--dry-run]
+  claude-tweaks install <inference-3p|computer-use-3p|connectors-3p|pet> [--app /Applications/Claude.app] [--dry-run]
   claude-tweaks restore [--app /Applications/Claude.app] [--dry-run]
 
 Legacy/direct invocation:
   ./claude-tweaks.ts [--app /Applications/Claude.app] [--dry-run]
   ./claude-tweaks.ts inference-3p [--app /Applications/Claude.app] [--dry-run]
   ./claude-tweaks.ts computer-use-3p [--app /Applications/Claude.app] [--dry-run]
+  ./claude-tweaks.ts connectors-3p [--app /Applications/Claude.app] [--dry-run]
   ./claude-tweaks.ts pet [--app /Applications/Claude.app] [--dry-run]
   ./claude-tweaks.ts --restore [--app /Applications/Claude.app] [--dry-run]
 
 What it patches:
   - inference-3p: gateway route verification, Cowork prompt forwarding, Electron UI gateway warning, ElectronAsarIntegrity hashes
   - computer-use-3p: Computer Use feature, opt-out, disabled, and TCC gates, plus ElectronAsarIntegrity hashes
+  - connectors-3p: custom 3P MCP discovery imports installed org-plugin connectors, plus ElectronAsarIntegrity hashes
   - pet: floating Codex mascot overlay for Claude, plus ElectronAsarIntegrity hashes
   - restore: backups created by this tool
 `);

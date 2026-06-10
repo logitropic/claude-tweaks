@@ -1,7 +1,7 @@
 {
   "name": "claude-tweaks",
   "version": "0.1.0",
-  "description": "Reversible macOS patcher for Claude Desktop ASAR tweaks, including third-party inference routing, Computer Use experiments, and an optional desktop pet overlay.",
+  "description": "Reversible macOS patcher for Claude Desktop ASAR tweaks, including third-party inference routing, connector discovery, Computer Use experiments, and an optional desktop pet overlay.",
   "type": "module",
   "license": "MIT",
   "author": "logitropic",
@@ -29,6 +29,8 @@
     "3p",
     "inference",
     "third-party-inference",
+    "connectors",
+    "mcp",
     "computer-use"
   ],
   "files": [
