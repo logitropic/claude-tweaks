@@ -1,6 +1,6 @@
 # claude-tweaks
 
-> Reversible macOS patcher for Claude Desktop that applies focused ASAR-level tweaks for third-party inference routing, Computer Use experiments, and an optional desktop pet overlay.
+> Reversible macOS patcher for Claude Desktop that applies focused ASAR-level tweaks for third-party inference routing, third-party connector discovery, Computer Use experiments, and an optional desktop pet overlay.
 
 ![Platform: macOS](https://img.shields.io/badge/platform-macOS-111111)
 ![Node.js >= 22](https://img.shields.io/badge/node-%3E%3D22-339933)
@@ -26,6 +26,7 @@ This project is not affiliated with Anthropic.
 |---|---|---|
 | `inference-3p` | Adjusts Claude Desktop's gateway route validation, Cowork prompt forwarding check, and Electron UI gateway warning. | Intended for routing inference through compatible third-party providers. |
 | `computer-use-3p` | Enables Computer Use paths that can be gated by platform, opt-out, disabled, or local permission checks. | Intended for third-party-provider experiments where Computer Use support is expected. |
+| `connectors-3p` | Lets custom 3P MCP discovery import installed org-plugin connector MCP configs instead of only plugins marked enabled in Cowork settings. | Keeps tool calls on Claude Desktop's direct custom 3P MCP path and routes org-plugin remote MCP servers through OAuth; connector auth is still required. |
 | `pet` | Adds a floating Codex-style desktop pet overlay with a sprite and speech bubble. | Cosmetic; works independently of the inference provider. |
 
 The patcher also recomputes the `ElectronAsarIntegrity` SHA256 hashes stored in every `Info.plist` inside `Claude.app`, so Claude's own integrity checks stay consistent.
@@ -48,6 +49,7 @@ npx github:logitropic/claude-tweaks install inference-3p
 
 # Install additional tweaks by running the command again
 npx github:logitropic/claude-tweaks install computer-use-3p
+npx github:logitropic/claude-tweaks install connectors-3p
 npx github:logitropic/claude-tweaks install pet
 ```
 
@@ -65,7 +67,7 @@ npm run cli -- install inference-3p
 ## Commands
 
 ```bash
-npx github:logitropic/claude-tweaks install <inference-3p|computer-use-3p|pet> [--app /Applications/Claude.app] [--dry-run]
+npx github:logitropic/claude-tweaks install <inference-3p|computer-use-3p|connectors-3p|pet> [--app /Applications/Claude.app] [--dry-run]
 npx github:logitropic/claude-tweaks restore [--app /Applications/Claude.app] [--dry-run]
 ```
 
@@ -87,15 +89,23 @@ expected a gateway model route referencing an Anthropic model (e.g. claude-sonne
 
 the route name is being checked against Claude Desktop's built-in gateway model validator. The `inference-3p` tweak adjusts that validation path for compatible third-party provider setups, so Anthropic-compatible model routes can be tested without the desktop app blocking the request before it reaches your provider.
 
+## Connector troubleshooting
+
+Claude Desktop's custom 3P MCP path can connect directly to remote MCP servers listed by installed org plugins. By default, Claude only imports connector MCP configs for org plugins marked enabled in Cowork settings. The `connectors-3p` tweak changes that discovery step to use `cowork_plugins/installed_plugins.json`, so installed org-plugin connectors can appear in 3P mode without routing tool calls through Anthropic's MCP proxy. It also treats org-plugin HTTP/SSE MCP entries as OAuth-capable, allowing the desktop app to start its custom 3P OAuth flow even when the plugin's `.mcp.json` omits an explicit `oauth` object.
+
+When Electron `safeStorage` is unavailable, Claude Desktop normally loses the dynamically registered OAuth client before the browser callback can exchange the authorization code. The `connectors-3p` tweak keeps that OAuth client and any resulting connector token in memory for the current Claude process, so the callback can complete without writing plaintext credentials to `config.json`. This is session-only: after quitting Claude, connectors that depended on that fallback may need to be authorized again.
+
+This does not bypass connector authentication or entitlement checks on the connector provider. Servers with OAuth or bearer-token requirements still need valid auth, and plugin entries with invalid or empty URLs are still skipped by Claude Desktop's existing MCP validation.
+
 ## How it works
 
-`claude-tweaks` reads Claude's `app.asar` (an Electron archive), parses its JSON header to locate the right file (`.vite/build/index.pre.js` for the main tweaks), performs a same-length byte-pattern replacement to inject the new code, recomputes the header SHA256, and patches every `Info.plist` that references the new integrity hash.
+`claude-tweaks` reads Claude's `app.asar` (an Electron archive), parses its JSON header to locate the right file (`.vite/build/index.js` for most tweaks, `.vite/build/index.pre.js` for the pet bootstrap), performs a same-length byte-pattern replacement to inject the new code, recomputes the header SHA256, and patches every `Info.plist` that references the new integrity hash.
 
 For the `pet` tweak, it additionally copies `pet-main.cjs`, `pet.html`, and the sprite into `Claude.app/Contents/Resources/claude-pet/`, and hooks Claude's main process by replacing a benign `require("node:events"); require("process"); require("crypto");` triple in `index.pre.js` with `require(process.resourcesPath+"/claude-pet/pet-main.cjs");`.
 
 ## When to use it
 
-The `inference-3p` and `computer-use-3p` tweaks are specifically for advanced workflows that route Claude Desktop requests through a third-party inference provider instead of Anthropic's own gateway. If you use Claude normally, these tweaks are unnecessary.
+The `inference-3p`, `computer-use-3p`, and `connectors-3p` tweaks are specifically for advanced workflows that route Claude Desktop requests through a third-party inference provider instead of Anthropic's own gateway. If you use Claude normally, these tweaks are unnecessary.
 
 The `pet` tweak is purely cosmetic and works regardless of the inference provider.
 
